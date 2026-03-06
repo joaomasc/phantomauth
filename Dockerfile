@@ -19,11 +19,10 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o auth-server ./cmd/server/main.go
 # Etapa 2: Runner (Imagem leve para produção)
 FROM alpine:latest
 
-WORKDIR /root/
+WORKDIR /app
 
 # Copiar binário da etapa anterior
 COPY --from=builder /app/auth-server .
-COPY --from=builder /app/.env . 
 
 # Copiar chaves RSA (em produção, usar Docker Secrets ou montar via volume)
 # COPY --from=builder /app/keys ./keys
