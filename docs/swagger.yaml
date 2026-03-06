@@ -1,0 +1,391 @@
+basePath: /api/v1/auth
+definitions:
+  controller.RegisterRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      password:
+        minLength: 8
+        type: string
+    required:
+    - email
+    - name
+    - password
+    type: object
+  controller.errorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  controller.loginRequest:
+    properties:
+      email:
+        example: user@example.com
+        type: string
+      password:
+        example: strongpassword123
+        type: string
+    type: object
+  controller.loginResponse:
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
+    type: object
+  controller.logoutRequest:
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
+    type: object
+  controller.mfaCodeRequest:
+    properties:
+      code:
+        example: "123456"
+        type: string
+    required:
+    - code
+    type: object
+  controller.mfaLoginRequest:
+    properties:
+      code:
+        example: "123456"
+        type: string
+      mfa_token:
+        example: uuid-do-mfa-token
+        type: string
+    required:
+    - code
+    - mfa_token
+    type: object
+  controller.mfaSetupResponse:
+    properties:
+      message:
+        type: string
+      otpauth_url:
+        type: string
+      secret:
+        type: string
+    type: object
+  controller.mfaStatusResponse:
+    properties:
+      mfa_enabled:
+        type: boolean
+    type: object
+  controller.refreshRequest:
+    properties:
+      refresh_token:
+        example: uuid-do-refresh-token
+        type: string
+    type: object
+  controller.validateResponse:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      role:
+        type: string
+      user_id:
+        type: string
+      valid:
+        type: boolean
+    type: object
+host: localhost:8081
+info:
+  contact:
+    name: João Masc
+    url: https://github.com/joaomasc
+  description: 'Serviço de autenticação genérico com segurança máxima: JWT RS256 (assimétrico),
+    MFA/TOTP (Google Authenticator), Rate Limiting, Phantom Token Pattern com TTL
+    reduzido e verificação de revogação em tempo real.'
+  license:
+    name: MIT
+  termsOfService: http://swagger.io/terms/
+  title: Auth Service API
+  version: "2.0"
+paths:
+  /login:
+    post:
+      consumes:
+      - application/json
+      description: Autentica com email e senha. Se MFA ativo, retorna mfa_token para
+        completar em /mfa/validate.
+      parameters:
+      - description: Credenciais de login
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/controller.loginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.loginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controller.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controller.errorResponse'
+      summary: Login do usuário
+      tags:
+      - auth
+  /logout:
+    post:
+      consumes:
+      - application/json
+      description: Revoga o phantom token (Redis) e o refresh token (DB), destruindo
+        a sessão.
+      parameters:
+      - description: Tokens a revogar
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/controller.logoutRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controller.errorResponse'
+      summary: Logout
+      tags:
+      - auth
+  /mfa/disable:
+    post:
+      consumes:
+      - application/json
+      description: Desativa o MFA exigindo confirmação com código TOTP atual.
+      parameters:
+      - description: Código TOTP
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/controller.mfaCodeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controller.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controller.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Desativar MFA
+      tags:
+      - mfa
+  /mfa/setup:
+    post:
+      description: Gera um segredo TOTP para o Google Authenticator. O MFA só fica
+        ativo após verificar o primeiro código em /mfa/verify-setup.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.mfaSetupResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controller.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Configurar MFA (TOTP)
+      tags:
+      - mfa
+  /mfa/status:
+    get:
+      description: Retorna se o MFA está ativo para o utilizador.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.mfaStatusResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controller.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Estado do MFA
+      tags:
+      - mfa
+  /mfa/validate:
+    post:
+      consumes:
+      - application/json
+      description: Completa o login enviando o código TOTP + o mfa_token recebido
+        em /login.
+      parameters:
+      - description: Token MFA + Código TOTP
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/controller.mfaLoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.loginResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controller.errorResponse'
+      summary: Validar MFA no login
+      tags:
+      - mfa
+  /mfa/verify-setup:
+    post:
+      consumes:
+      - application/json
+      description: Valida o primeiro código TOTP e ativa o MFA permanentemente para
+        o utilizador.
+      parameters:
+      - description: Código TOTP
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/controller.mfaCodeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controller.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controller.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Verificar setup do MFA
+      tags:
+      - mfa
+  /refresh:
+    post:
+      consumes:
+      - application/json
+      description: Troca o refresh_token por um novo par access_token + refresh_token.
+        O refresh_token antigo é invalidado (rotação).
+      parameters:
+      - description: Refresh token
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/controller.refreshRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.loginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controller.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controller.errorResponse'
+      summary: Renovar token de acesso
+      tags:
+      - auth
+  /register:
+    post:
+      consumes:
+      - application/json
+      description: Cria um novo utilizador e devolve os tokens de acesso imediatamente
+        (auto-login).
+      parameters:
+      - description: Dados de registo
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/controller.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/controller.loginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controller.errorResponse'
+      summary: Registo de nova conta
+      tags:
+      - auth
+  /validate:
+    post:
+      description: Valida um Phantom Token e retorna as claims do utilizador. Consumida
+        internamente por serviços que dependem da autenticação.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.validateResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/controller.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Validar token (uso interno)
+      tags:
+      - auth
+securityDefinitions:
+  BearerAuth:
+    description: 'Digite: Bearer {token}'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  # 1. Banco de Dados (PostgreSQL)
+  postgres:
+    image: postgres:15-alpine
+    container_name: auth_service_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-authuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no .env}
+      POSTGRES_DB: ${POSTGRES_DB:-authdb}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations/init.sql:/docker-entrypoint-initdb.d/01_init.sql
+      - ./migrations/002_add_mfa.sql:/docker-entrypoint-initdb.d/02_mfa.sql
+
+  # 2. Cache (Redis) - Obrigatório para Phantom Tokens
+  redis:
+    image: redis:alpine
+    container_name: auth_service_redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+  # 3. Aplicação (Auth Service)
+  app:
+    build: .
+    container_name: auth_service_app
+    restart: always
+    ports:
+      - "8081:8081"
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      AUTH_DB_DSN: postgres://${POSTGRES_USER:-authuser}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-authdb}?sslmode=disable
+      AUTH_REDIS_ADDR: redis://redis:6379
+      JWT_PRIVATE_KEY_PATH: /app/keys/private.pem
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:?Defina MFA_ENCRYPTION_KEY no .env}
+      AUTH_ISSUER: ${AUTH_ISSUER:-auth-service}
+      PHANTOM_TOKEN_TTL: 5m
+      REFRESH_TOKEN_TTL: 168h
+      RATE_LIMIT_LOGIN: 5
+      RATE_LIMIT_REGISTER: 3
+      RATE_LIMIT_WINDOW: 1m
+      AUTH_PORT: 8081
+    volumes:
+      - ./keys:/app/keys:ro
+
+volumes:
+  postgres_data:

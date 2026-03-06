@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth Service</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>🔐 Auth Service</h1>
+            <p class="subtitle">Phantom Token · RS256 · MFA/TOTP</p>
+            <div id="user-bar" class="user-bar hidden">
+                <span id="user-info"></span>
+                <button onclick="app.logout()" class="btn btn-sm btn-danger">Sair</button>
+            </div>
+        </header>
+
+        <!-- Toast notifications -->
+        <div id="toast" class="toast hidden"></div>
+
+        <!-- ===== AUTH SCREENS ===== -->
+
+        <!-- Login -->
+        <section id="screen-login" class="card">
+            <h2>Entrar</h2>
+            <form onsubmit="app.login(event)">
+                <div class="field">
+                    <label for="login-email">Email</label>
+                    <input type="email" id="login-email" required placeholder="seu@email.com">
+                </div>
+                <div class="field">
+                    <label for="login-password">Password</label>
+                    <input type="password" id="login-password" required placeholder="••••••••">
+                </div>
+                <button type="submit" class="btn btn-primary">Entrar</button>
+            </form>
+            <p class="link-text">Não tem conta? <a href="#" onclick="app.showScreen('register')">Registar</a></p>
+        </section>
+
+        <!-- Register -->
+        <section id="screen-register" class="card hidden">
+            <h2>Criar Conta</h2>
+            <form onsubmit="app.register(event)">
+                <div class="field">
+                    <label for="reg-name">Nome</label>
+                    <input type="text" id="reg-name" required placeholder="João Silva">
+                </div>
+                <div class="field">
+                    <label for="reg-email">Email</label>
+                    <input type="email" id="reg-email" required placeholder="seu@email.com">
+                </div>
+                <div class="field">
+                    <label for="reg-password">Password</label>
+                    <input type="password" id="reg-password" required placeholder="Min. 8 chars (A-z, 0-9, !@#)">
+                </div>
+                <div class="password-rules">
+                    <span id="rule-len">✗ 8+ caracteres</span>
+                    <span id="rule-upper">✗ Maiúscula</span>
+                    <span id="rule-lower">✗ Minúscula</span>
+                    <span id="rule-digit">✗ Número</span>
+                    <span id="rule-special">✗ Especial (!@#$)</span>
+                </div>
+                <button type="submit" class="btn btn-primary">Registar</button>
+            </form>
+            <p class="link-text">Já tem conta? <a href="#" onclick="app.showScreen('login')">Entrar</a></p>
+        </section>
+
+        <!-- MFA Challenge (login step 2) -->
+        <section id="screen-mfa-challenge" class="card hidden">
+            <h2>🔑 Verificação 2FA</h2>
+            <p>Insira o código do Google Authenticator:</p>
+            <form onsubmit="app.mfaValidateLogin(event)">
+                <div class="field">
+                    <input type="text" id="mfa-code" required placeholder="000000"
+                           maxlength="6" pattern="[0-9]{6}" inputmode="numeric"
+                           autocomplete="one-time-code" class="code-input">
+                </div>
+                <button type="submit" class="btn btn-primary">Verificar</button>
+            </form>
+            <p class="link-text"><a href="#" onclick="app.showScreen('login')">← Voltar ao login</a></p>
+        </section>
+
+        <!-- ===== DASHBOARD (autenticado) ===== -->
+
+        <section id="screen-dashboard" class="card hidden">
+            <h2>Dashboard</h2>
+
+            <!-- Token info -->
+            <div class="info-box">
+                <h3>🎟️ Sessão</h3>
+                <div class="token-display">
+                    <div><strong>Opaque Token:</strong> <code id="dash-opaque"></code></div>
+                    <div><strong>Expira em:</strong> <span id="dash-exp"></span></div>
+                    <div><strong>User ID:</strong> <span id="dash-uid"></span></div>
+                    <div><strong>Role:</strong> <span id="dash-role"></span></div>
+                </div>
+                <div class="btn-group">
+                    <button onclick="app.validateToken()" class="btn btn-sm btn-secondary">Validar Token</button>
+                </div>
+            </div>
+
+            <!-- MFA Section -->
+            <div class="info-box">
+                <h3>🛡️ Autenticação 2FA</h3>
+                <div id="mfa-status-box">
+                    <p>Status: <strong id="mfa-status-text">A carregar...</strong></p>
+                </div>
+                <div id="mfa-actions"></div>
+
+                <!-- MFA Setup (hidden by default) -->
+                <div id="mfa-setup-area" class="hidden">
+                    <div class="qr-area">
+                        <div id="qr-code"></div>
+                        <p class="small">Ou insira manualmente: <code id="mfa-secret"></code></p>
+                    </div>
+                    <form onsubmit="app.mfaVerifySetup(event)">
+                        <div class="field">
+                            <label>Código do Authenticator:</label>
+                            <input type="text" id="mfa-setup-code" required placeholder="000000"
+                                   maxlength="6" pattern="[0-9]{6}" inputmode="numeric" class="code-input">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Confirmar Ativação</button>
+                    </form>
+                </div>
+
+                <!-- MFA Disable -->
+                <div id="mfa-disable-area" class="hidden">
+                    <form onsubmit="app.mfaDisable(event)">
+                        <div class="field">
+                            <label>Código TOTP para desativar:</label>
+                            <input type="text" id="mfa-disable-code" required placeholder="000000"
+                                   maxlength="6" pattern="[0-9]{6}" inputmode="numeric" class="code-input">
+                        </div>
+                        <button type="submit" class="btn btn-sm btn-danger">Desativar 2FA</button>
+                    </form>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

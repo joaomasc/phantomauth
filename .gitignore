@@ -1,0 +1,36 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+auth-service
+server
+
+# Test binary
+*.test
+
+# Coverage
+*.out
+
+# Dependencies
+vendor/
+
+# Go workspace
+go.work
+
+# Environment files — NUNCA commitar credenciais reais
+.env
+.env.local
+.env.development
+.env.production
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Misc
+estutura.txt
