@@ -342,7 +342,7 @@ func (s *AuthService) Register(ctx context.Context, name, email, password string
 	dbCtx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	user, err := s.userRepo.CreateUser(dbCtx, name, email, string(hash), "admin")
+	user, err := s.userRepo.CreateUser(dbCtx, name, email, string(hash), "user")
 	if err != nil {
 		log.Printf("[register] falha ao criar usuario (email=%q): %v", email, err)
 		return "", "", fmt.Errorf("falha ao criar conta: %w", err)
