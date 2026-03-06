@@ -15,8 +15,8 @@ type LoginResult struct {
 	MFAToken     string // token temporario para validacao mfa (5min ttl)
 }
 
-// AuthServiceInterface define o contrato que tanto *AuthService quanto
-// *TimedAuthService implementam. o controller depende desta interface.
+// AuthServiceInterface define o contrato do auth service.
+// o controller depende desta interface.
 type AuthServiceInterface interface {
 	// -- auth core --
 	Login(ctx context.Context, email, password string, info ...LoginInfo) (*LoginResult, error)

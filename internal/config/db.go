@@ -17,17 +17,17 @@ func NewDB(dsn string) *pgxpool.Pool {
 		log.Fatalf("falha ao parsear config do db: %v", err)
 	}
 
-	// ajuste do pool - auth service faz poucas queries (login, validate, refresh)
+	// ajuste do pool - valores razoaveis para um auth service
 	config.MaxConns = 10
-	config.MinConns = 2                                 // manter 2 conexoes quentes para evitar cold start
-	config.ConnConfig.ConnectTimeout = 10 * time.Second // 10s maximo para novas conexoes tcp
-	config.MaxConnIdleTime = 4 * time.Minute            // < 5min timeout neon, evita conexoes mortas
+	config.MinConns = 2
+	config.ConnConfig.ConnectTimeout = 10 * time.Second
+	config.MaxConnIdleTime = 5 * time.Minute
 	config.MaxConnLifetime = 1 * time.Hour
-	config.HealthCheckPeriod = 30 * time.Second // detecta conexoes mortas rapido
+	config.HealthCheckPeriod = 30 * time.Second
 
-	// timezone consistente
+	// timezone padrao do servidor
 	config.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
-		_, err := conn.Exec(ctx, "SET timezone = 'America/Sao_Paulo'")
+		_, err := conn.Exec(ctx, "SET timezone = 'UTC'")
 		return err
 	}
 
@@ -36,22 +36,21 @@ func NewDB(dsn string) *pgxpool.Pool {
 		log.Fatalf("falha ao criar pool: %v", err)
 	}
 
-	// neon e serverless - pode estar hibernando (cold start ate 60s).
-	// tenta ate 10 vezes com timeout generoso.
+	// tenta conectar com retry - util para bancos serverless ou containers subindo
 	var pingErr error
-	for attempt := 1; attempt <= 10; attempt++ {
-		pingCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	for attempt := 1; attempt <= 5; attempt++ {
+		pingCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		pingErr = db.Ping(pingCtx)
 		cancel()
 
 		if pingErr == nil {
-			log.Println("conectado ao postgres (neon) com sucesso")
+			log.Println("conectado ao postgres com sucesso")
 			return db
 		}
-		log.Printf("neon db ainda acordando (tentativa %d/10): %v", attempt, pingErr)
-		time.Sleep(3 * time.Second)
+		log.Printf("aguardando postgres (tentativa %d/5): %v", attempt, pingErr)
+		time.Sleep(2 * time.Second)
 	}
 
-	log.Fatalf("db nao respondeu apos 10 tentativas: %v", pingErr)
+	log.Fatalf("postgres nao respondeu apos 5 tentativas: %v", pingErr)
 	return nil
 }
